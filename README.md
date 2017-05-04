@@ -1,11 +1,23 @@
 INFO:
 =====
-Just a silly golang prime finding application. Not terribly optimized, but it finds primes between a range of numbers by splitting up the work between multiple go routines.
+Just a silly golang prime finding application I cobbled together to help me learn channels and docker/libchan.
 
-Borrowed heavily from Rob Pike's balancer for Go. The main challenge for me was that the program was intended to run with a never ending supply of 'work'. Once that was changed to a discrete set of tasks, my god it's full of deadlocks. Now that that's solved I'll work on networking.
+Each worker is just running the sieve of Erathosthenes. I don't believe it's optimized for splitting up the tasks like this and realistically each worker is probbly finding primes from 2 to it's ending adddress. There's ways to imrpove this, but I don't care about primes, I just wanted to send data to multiple places, get data back from multiple places, and display it. This was sufficient for me to learn about channels and libchan.
+
+I started by borrowing heavily from Rob Pike's balancer for Go at https://gist.github.com/angeldm/2421216. The main challenge for me was that the program was intended to run with a never ending supply of 'work'. Once that was changed to a discrete set of tasks, my god it's full of deadlocks. So part of the learning was sorting all of that out.
+
+To pass stuff around on the network I used the docker/libchan example as a starting point:
+https://github.com/docker/libchan/tree/master/examples
+
+USAGE:
+======
+Run prime-worker on each host you want to use as a worker and make sure port 65521 is open.  
+
+Run prime-client with an end address and list of workers:
+```time go run prime-client.go 10000000000 host1 host2 ...```
+
+10,000,000,000 takes about 4 minutes for me to get the results. I have not tried larger. Smaller is much faster. 1,000,000,000 is under 30 seconds for me.
 
 TODO:
 =====
-Right now 'workers' are just goroutines on the local host.
-
-I'd like to get to sending work to workers running on this and a couple other hosts.
+I'm sure a lot of garbage could be cleaned up.

@@ -34,7 +34,7 @@ type Response struct {
 func main() {
   var listener net.Listener
   var err error
-  listener, err = net.Listen("tcp", "localhost:9323")
+  listener, err = net.Listen("tcp", "0.0.0.0:65521")
   if err != nil {
     log.Fatal(err)
   }

@@ -5,9 +5,11 @@ import "container/heap"
 import "sync"
 import "net"
 import "log"
+import "os"
+import "strconv"
 
 import "github.com/docker/libchan"
-//import "github.com/docker/libchan/spdy"
+import "github.com/docker/libchan/spdy"
 
 const nWorker = 3
 const nRequester = 3
@@ -36,7 +38,10 @@ func requester(work chan Request, X uint64, Y uint64) {
   defer wg.Done()
   work <- Request{X, Y, c}
   result := <-c
-  fmt.Println(len(result))
+  fmt.Println("Worker start:  ", X)
+  fmt.Println("Worker end:    ", Y)
+  fmt.Println("Worker primes: ", len(result))
+  fmt.Println("--------")
 }
 
 type Worker struct {
@@ -53,16 +58,45 @@ func (w *Worker) work(done chan *Worker) {
 }
 
 func dial(w *Worker, start uint64, end uint64) ([]uint64) {
-  //var client net.Conn
+  var client net.Conn
   var err error
-  endpoint := w.address + ":9323"
-  _, err = net.Dial("tcp", endpoint)
-
+  endpoint := w.address + ":65521"
+  client, err = net.Dial("tcp", endpoint)
   if err != nil {
       log.Fatal(err)
   }
-  var u []uint64
-  return u
+
+  p, err := spdy.NewSpdyStreamProvider(client, false)
+  if err != nil {
+    log.Fatal(err)
+  }
+  transport := spdy.NewTransport(p)
+  sender, err := transport.NewSendChannel()
+  if err != nil {
+    log.Fatal(err)
+  }
+
+  receiver, remoteSender := libchan.Pipe()
+
+  request := &RemoteRequest{
+    Start:      start,
+    End:        end,
+    StatusChan: remoteSender,
+  }
+
+  err = sender.Send(request)
+  if err != nil {
+    log.Fatal(err)
+  }
+
+  response := &Response{}
+
+  err = receiver.Receive(response)
+  if err != nil {
+    log.Fatal(err)
+  }
+
+  return response.Result
 }
 
 type Pool []*Worker
@@ -107,8 +141,8 @@ type Balancer struct {
 func NewBalancer() *Balancer {
 	done := make(chan *Worker, nWorker)
 	b := &Balancer{make(Pool, 0, nWorker), done, 0}
-	for i := 0; i < nWorker; i++ {
-		w := &Worker{requests: make(chan Request, nRequester)}
+	for i := 0; i < len(os.Args[2:]); i++ {
+		w := &Worker{requests: make(chan Request, nRequester), address: os.Args[i+2]}
 		heap.Push(&b.pool, w)
 		go w.work(b.done)
 	}
@@ -176,9 +210,16 @@ func (b *Balancer) completed(w *Worker) {
 }
 
 func main() {
+    if len(os.Args) < 2 {
+        log.Fatal("usage: <end> <worker> [ worker ... ]")
+    }
+
     work := make(chan Request)
-    x := uint64(1000000000)
-    workers := uint64(3)
+
+    c, _ := strconv.ParseInt((os.Args[1]), 0, 64)
+
+    x := uint64(c)
+    workers := uint64(len(os.Args[2:]))
 
     index :=  uint64(1)
 
@@ -200,9 +241,6 @@ func main() {
       if end > x {
         end = x
       }
-      fmt.Println("Worker start:  ", start)
-      fmt.Println("Worker end:    ", end)
-      fmt.Println("--------")
       wg.Add(1)
       go requester(work, start, end)
     }
