@@ -14,6 +14,7 @@ USAGE:
 Run prime-worker on each host you want to use as a worker and make sure port 65521 is open.  
 
 Run prime-client with an end number and one or more worker hostnames or ip addresses:    
+
 ```time go run prime-client.go 10000000000 host1 host2 ...```
 
 10,000,000,000 takes about 4 minutes for me to get the results. I have not tried larger. Smaller is much faster. 1,000,000,000 is under 30 seconds for me.
